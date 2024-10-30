@@ -7,20 +7,27 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.DriveScopes;
+import org.apache.coyote.BadRequestException;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageOutputStream;
+import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
@@ -87,9 +94,31 @@ public class FileService {
         try (PDDocument document = PDDocument.load(pdfFile)) {
             PDFRenderer pdfRenderer = new PDFRenderer(document);
             for (int page = 0; page < document.getNumberOfPages(); page++) {
-                BufferedImage bufferedImage = pdfRenderer.renderImageWithDPI(page, 300);
-                File imageFile = File.createTempFile("page_" + (page + 1), ".png");
-                ImageIO.write(bufferedImage, "png", imageFile);
+                BufferedImage originalImage = pdfRenderer.renderImageWithDPI(page, 100);
+
+                // Reducir la profundidad de color a 24 bits
+                BufferedImage reducedColorImage = new BufferedImage(
+                        originalImage.getWidth(),
+                        originalImage.getHeight(),
+                        BufferedImage.TYPE_INT_RGB);
+                Graphics2D g2d = reducedColorImage.createGraphics();
+                g2d.drawImage(originalImage, 0, 0, null);
+                g2d.dispose();
+
+                File imageFile = File.createTempFile("page_" + (page + 1), ".jpg");
+
+                // Compresión progresiva JPEG
+                ImageWriter jpgWriter = ImageIO.getImageWritersByFormatName("jpg").next();
+                ImageWriteParam jpgWriteParam = jpgWriter.getDefaultWriteParam();
+                jpgWriteParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+                jpgWriteParam.setCompressionQuality(0.6f);
+                jpgWriteParam.setProgressiveMode(ImageWriteParam.MODE_DEFAULT); // Compresión progresiva
+
+                try (ImageOutputStream outputStream = ImageIO.createImageOutputStream(imageFile)) {
+                    jpgWriter.setOutput(outputStream);
+                    jpgWriter.write(null, new IIOImage(reducedColorImage, null, null), jpgWriteParam);
+                }
+                jpgWriter.dispose();
                 imageFiles.add(imageFile);
             }
         }
@@ -135,5 +164,29 @@ public class FileService {
         } catch (Exception e) {
             System.out.println("Error deleting file: " + e.getMessage());
         }
+    }
+
+    public File getTempFileFromLink(String linkPdf) throws IOException {
+        URL url = new URL(linkPdf);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+        connection.setRequestProperty("Accept", "application/pdf");
+
+        int responseCode = connection.getResponseCode();
+        if (responseCode != HttpURLConnection.HTTP_OK) {
+            throw new IOException("Failed to download PDF: " + responseCode);
+        }
+
+        File tempFile = File.createTempFile("temp", ".pdf");
+        try (InputStream inputStream = connection.getInputStream();
+             FileOutputStream outputStream = new FileOutputStream(tempFile)) {
+
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+            }
+        }
+        return tempFile;
     }
 }

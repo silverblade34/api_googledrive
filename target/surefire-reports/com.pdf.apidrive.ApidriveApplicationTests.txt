@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.pdf.apidrive.ApidriveApplicationTests
 -------------------------------------------------------------------------------
-Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.205 s -- in com.pdf.apidrive.ApidriveApplicationTests
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.047 s -- in com.pdf.apidrive.ApidriveApplicationTests

@@ -40,7 +40,7 @@ public class FileController {
         }
     }
 
-    @PostMapping("/convertPdfToImages")
+    @PostMapping("/convert/pdfToImages")
     public ResponseEntity<ApiResponse<?>> convertPdfToImages(@RequestParam("pdf") MultipartFile file) throws IOException {
         try {
             if (file.isEmpty()) {
@@ -48,6 +48,7 @@ public class FileController {
             }
             File tempFile = File.createTempFile("temp", ".pdf");
             file.transferTo(tempFile);
+
             List<File> imageFiles = service.convertPdfToImages(tempFile);
             tempFile.delete();
 
@@ -57,6 +58,24 @@ public class FileController {
         } catch (Exception e) {
             ApiResponse<String> response = new ApiResponse<>(e.getMessage(), null);
             return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @PostMapping("/convert/linkPdfToImages")
+    public ResponseEntity<ApiResponse<?>> convertLinkPdfToImages(@RequestParam("link") String linkPdf) {
+        try {
+            File tempFile = service.getTempFileFromLink(linkPdf);
+            List<File> imageFiles = service.convertPdfToImages(tempFile);
+            tempFile.delete();
+            List<String> urls = service.sendArrayFiles(imageFiles);
+            ApiResponse<List<String>> response = new ApiResponse<>("The PDF was converted to images correctly", urls);
+            return new ResponseEntity<>(response, HttpStatus.OK);
+        } catch (IOException e) {
+            ApiResponse<String> response = new ApiResponse<>(e.getMessage(), null);
+            return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+        } catch (Exception e) {
+            ApiResponse<String> response = new ApiResponse<>(e.getMessage(), null);
+            return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }
