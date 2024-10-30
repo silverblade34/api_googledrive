@@ -36,7 +36,7 @@ public class FileService {
         return filePath.toString();
     }
 
-    public String uploadFileToDrive(File file, String type) {
+    public String uploadFileToDrive(File file, String type, String fileName) {
         try {
             String folderId = type.equals("CONVERT") ? "1SEfZotf96NFnbjCwmevO_fQnHxo9zEXS" : "1aeV8dYjCTLdlq4qkQGvLdlwQkfzNtYQG";
             Drive drive = createDriveService();
@@ -45,7 +45,18 @@ public class FileService {
             fileMetaData.setName(file.getName());
             fileMetaData.setParents(Collections.singletonList(folderId));
 
-            FileContent mediaContent = new FileContent("image/jpeg", file);
+            String mimeType;
+            if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") || fileName.endsWith(".png")) {
+                mimeType = "image/jpeg";
+            } else if (fileName.endsWith(".pdf")) {
+                mimeType = "application/pdf";
+            } else if (fileName.endsWith(".doc") || fileName.endsWith(".docx")) {
+                mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            } else {
+                throw new IllegalArgumentException("Tipo de archivo no soportado");
+            }
+
+            FileContent mediaContent = new FileContent(mimeType, file);
             com.google.api.services.drive.model.File uploadFile = drive.files().create(fileMetaData, mediaContent).setFields("id, createdTime").execute();
             if (type.equals("CONVERT")) {
                 addToTemporaryStorage(uploadFile.getId(), uploadFile.getCreatedTime().getValue());
@@ -88,8 +99,8 @@ public class FileService {
     public List<String> sendArrayFiles(List<File> files) {
         List<CompletableFuture<String>> futures = files.stream()
                 .map(imageFile -> CompletableFuture.supplyAsync(() -> {
-                    System.out.println("Subiendo archivo: " + imageFile.getName()); // Agregar log aquí
-                    String urlFile = uploadFileToDrive(imageFile, "CONVERT");
+                    System.out.println("Subiendo archivo: " + imageFile.getName());
+                    String urlFile = uploadFileToDrive(imageFile, "CONVERT", imageFile.getName());
                     imageFile.delete();
                     return urlFile;
                 }))

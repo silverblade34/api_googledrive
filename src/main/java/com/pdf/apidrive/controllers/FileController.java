@@ -31,7 +31,7 @@ public class FileController {
             }
             File tempFile = File.createTempFile("temp", null);
             file.transferTo(tempFile);
-            String url = service.uploadFileToDrive(tempFile, "UPLOAD");
+            String url = service.uploadFileToDrive(tempFile, "UPLOAD", file.getOriginalFilename());
             ApiResponse<String> response = new ApiResponse<>("File saved successfully", url);
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (Exception e) {
